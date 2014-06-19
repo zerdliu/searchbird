@@ -7,6 +7,11 @@ import com.twitter.searchbird.config._
 new SearchbirdServiceConfig {
 
   // Add your own config here
+  shards = Seq(
+    "localhost:9000",
+    "localhost:9001",
+    "localhost:9002"
+  )
 
   // Where your service will be exposed.
   thriftPort = 9999

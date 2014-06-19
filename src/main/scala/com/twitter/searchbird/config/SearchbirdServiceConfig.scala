@@ -11,11 +11,33 @@ import com.twitter.util.Config
 
 class SearchbirdServiceConfig extends ServerConfig[SearchbirdService.ThriftServer] {
   var thriftPort: Int = 9999
-//  var tracerFactory: Tracer.Factory = NullTracer.factory
+  var shards: Seq[String] = Seq()
+  // var tracerFactory: Tracer.Factory = NullTracer.factory
   var tracerFactory: Tracer.Factory =
     ZipkinTracer(scribeHost="127.0.0.1", scribePort=9410,
       // statsReceiver = NullStatsReceiver,
       sampleRate=1.toFloat)
 
-  def apply(runtime: RuntimeEnvironment) = new SearchbirdServiceImpl(this)
+  //def apply(runtime: RuntimeEnvironment) = new SearchbirdServiceImpl(this, new ResidentIndex)
+  def apply(runtime: RuntimeEnvironment) = {
+    val index = runtime.arguments.get("shard") match {
+      case Some(arg) =>
+        val which = arg.toInt
+        if (which >= shards.size || which < 0)
+          throw new Exception("invalid shard number %d".format(which))
+  
+        // override with the shard port
+        val Array(_, port) = shards(which).split(":")
+        thriftPort = port.toInt
+  
+        new ResidentIndex
+  
+      case None =>
+        require(!shards.isEmpty)
+        val remotes = shards map { new RemoteIndex(_) }
+    new CompositeIndex(remotes)
+  }
+
+    new SearchbirdServiceImpl(this, index)
+  }
 }
